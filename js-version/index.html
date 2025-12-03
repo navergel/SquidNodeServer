@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zip Settings Editor</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <button class="home-button" id="homeButton">Home</button>
+    
+    <div class="container">
+        <h1>Zip Settings Editor</h1>
+        
+        <div id="loading">
+            <p>Select a zip file to edit</p>
+        </div>
+        
+        <div id="error" class="hidden">
+            <p class="error-message"></p>
+        </div>
+        
+        <div id="zipSelection">
+            <h2>Select a Zip File</h2>
+            <div class="form-group">
+                <input type="file" id="zipFileInput" accept=".zip" />
+                <p class="help-text">Select a zip file from your computer</p>
+            </div>
+        </div>
+        
+        <div id="content" class="hidden">
+            <h2>Edit Settings</h2>
+            <p>Zip File: <span id="zipFileName"></span></p>
+            
+            <form id="settingsForm">
+                <div id="settingsFields">
+                    <!-- Settings fields will be dynamically generated here -->
+                </div>
+                
+                <div class="form-group checkbox">
+                    <input type="checkbox" id="upgradeFirmware" name="upgradeFirmware">
+                    <label for="upgradeFirmware">Update Firmware</label>
+                </div>
+                
+                <div class="button-group">
+                    <button type="submit" id="saveButton">Save Changes</button>
+                </div>
+            </form>
+        </div>
+        
+        <div id="success" class="hidden">
+            <p>Settings saved successfully!</p>
+            <button id="downloadButton">Download Modified Zip</button>
+        </div>
+    </div>
+    
+    <!-- Include JSZip library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
