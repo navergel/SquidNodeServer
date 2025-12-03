@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test RVServer HTTP Warning</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+        }
+        .test-passed {
+            color: green;
+            font-weight: bold;
+        }
+        .test-failed {
+            color: red;
+            font-weight: bold;
+        }
+        .home-button {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 8px 12px;
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            z-index: 1000;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+        .home-button:hover {
+            background-color: #0b7dda;
+        }
+        .instructions {
+            background-color: #fff3cd;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border-left: 5px solid #ffc107;
+        }
+        .warning-text {
+            color: #f44336;
+            font-size: 14px;
+            margin-left: 10px;
+            display: inline-block;
+            font-weight: normal;
+        }
+        .hidden {
+            display: none;
+        }
+        .label-container {
+            display: flex;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+    <button class="home-button" id="homeButton">Home</button>
+    
+    <h1>Test RVServer HTTP Warning</h1>
+    <div class="instructions">
+        <h3>Test Instructions:</h3>
+        <p>This page tests that a warning text appears next to the RVServer label when a user types "http" in the RVServer field.</p>
+        <ol>
+            <li>Type "http" in the RVServer field below.</li>
+            <li>A red warning text should appear next to the RVServer label.</li>
+            <li>Delete "http" from the field.</li>
+            <li>The warning text should disappear.</li>
+            <li>The test results will be displayed below.</li>
+        </ol>
+    </div>
+    
+    <div class="form-group">
+        <div class="label-container">
+            <label for="RVServer">RVServer:</label>
+            <span id="rvserver-warning" class="warning-text hidden">Warning: You are entering "http" in the rvserver field.</span>
+        </div>
+        <input type="text" id="RVServer" name="RVServer">
+    </div>
+    
+    <div class="form-group">
+        <button id="triggerHttpWarning" style="background-color: #ff9800; margin-right: 10px;">Trigger HTTP Warning</button>
+        <button id="clearWarning" style="background-color: #2196F3;">Clear Warning</button>
+    </div>
+    
+    <div class="result">
+        <h2>Test Results:</h2>
+        <div id="testResults">
+            <p>Type "http" in the field above to run the test.</p>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const rvServerInput = document.getElementById('RVServer');
+            const testResults = document.getElementById('testResults');
+            const warningElement = document.getElementById('rvserver-warning');
+            const triggerHttpWarningBtn = document.getElementById('triggerHttpWarning');
+            const clearWarningBtn = document.getElementById('clearWarning');
+            let warningShown = false;
+            
+            // Add event listener to RVServer input
+            rvServerInput.addEventListener('input', function(e) {
+                const value = e.target.value.toLowerCase();
+                
+                // If "http" is typed, show the warning
+                if (value.includes('http')) {
+                    warningElement.classList.remove('hidden');
+                    warningShown = true;
+                    
+                    // Test: Warning should be shown when "http" is typed
+                    testResults.innerHTML = '';
+                    addTestResult('Test: Warning text is shown when "http" is typed in the RVServer field', true);
+                } else if (warningShown) {
+                    // If "http" was previously shown but now removed
+                    warningElement.classList.add('hidden');
+                    warningShown = false;
+                    
+                    // Test: Warning should be hidden when "http" is removed
+                    testResults.innerHTML = '';
+                    addTestResult('Test: Warning text is hidden when "http" is removed from the RVServer field', true);
+                }
+            });
+            
+            // Add functionality to trigger HTTP warning button
+            triggerHttpWarningBtn.addEventListener('click', function() {
+                rvServerInput.value = 'http://example.com';
+                
+                // Create and dispatch an input event
+                const inputEvent = new Event('input', {
+                    bubbles: true,
+                    cancelable: true
+                });
+                rvServerInput.dispatchEvent(inputEvent);
+            });
+            
+            // Add functionality to clear warning button
+            clearWarningBtn.addEventListener('click', function() {
+                rvServerInput.value = '';
+                
+                // Create and dispatch an input event
+                const inputEvent = new Event('input', {
+                    bubbles: true,
+                    cancelable: true
+                });
+                rvServerInput.dispatchEvent(inputEvent);
+            });
+            
+            // Function to add test result
+            function addTestResult(message, passed) {
+                const resultElement = document.createElement('p');
+                resultElement.textContent = message;
+                resultElement.className = passed ? 'test-passed' : 'test-failed';
+                testResults.appendChild(resultElement);
+            }
+            
+            // Add home button functionality
+            document.getElementById('homeButton').addEventListener('click', function() {
+                window.location.href = '/';
+            });
+            
+            // Expose functions for external access (for PowerShell automation)
+            window.triggerHttpWarning = function() {
+                triggerHttpWarningBtn.click();
+            };
+            
+            window.clearWarning = function() {
+                clearWarningBtn.click();
+            };
+        });
+    </script>
+</body>
+</html>

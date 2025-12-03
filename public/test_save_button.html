@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Save Button Functionality</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+        }
+        .test-passed {
+            color: green;
+            font-weight: bold;
+        }
+        .test-failed {
+            color: red;
+            font-weight: bold;
+        }
+        .home-button {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 8px 12px;
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            z-index: 1000;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+        .home-button:hover {
+            background-color: #0b7dda;
+        }
+    </style>
+</head>
+<body>
+    <button class="home-button" id="homeButton">Home</button>
+    
+    <h1>Test Save Button Functionality</h1>
+    <p>This page tests that the Save Changes button is only enabled when the RVServer parameter has a value.</p>
+    
+    <div class="form-group">
+        <label for="RVServer">RVServer:</label>
+        <input type="text" id="RVServer" name="RVServer">
+    </div>
+    
+    <button id="saveButton" disabled>Save Changes</button>
+    
+    <div class="result">
+        <h2>Test Results:</h2>
+        <div id="testResults"></div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const rvServerInput = document.getElementById('RVServer');
+            const saveButton = document.getElementById('saveButton');
+            const testResults = document.getElementById('testResults');
+            
+            // Function to validate the form and enable/disable the Save Changes button
+            function validateForm() {
+                if (rvServerInput.value.trim() !== '') {
+                    saveButton.disabled = false;
+                } else {
+                    saveButton.disabled = true;
+                }
+                
+                // Run tests
+                runTests();
+            }
+            
+            // Add event listener to RVServer input
+            rvServerInput.addEventListener('input', validateForm);
+            
+            // Function to run tests
+            function runTests() {
+                testResults.innerHTML = '';
+                
+                // Test 1: Button should be disabled when RVServer is empty
+                if (rvServerInput.value.trim() === '' && saveButton.disabled) {
+                    addTestResult('Test 1: Button is disabled when RVServer is empty', true);
+                } else if (rvServerInput.value.trim() === '' && !saveButton.disabled) {
+                    addTestResult('Test 1: Button should be disabled when RVServer is empty', false);
+                }
+                
+                // Test 2: Button should be enabled when RVServer has a value
+                if (rvServerInput.value.trim() !== '' && !saveButton.disabled) {
+                    addTestResult('Test 2: Button is enabled when RVServer has a value', true);
+                } else if (rvServerInput.value.trim() !== '' && saveButton.disabled) {
+                    addTestResult('Test 2: Button should be enabled when RVServer has a value', false);
+                }
+            }
+            
+            // Function to add test result
+            function addTestResult(message, passed) {
+                const resultElement = document.createElement('p');
+                resultElement.textContent = message;
+                resultElement.className = passed ? 'test-passed' : 'test-failed';
+                testResults.appendChild(resultElement);
+            }
+            
+            // Run tests initially
+            runTests();
+            
+            // Add home button functionality
+            document.getElementById('homeButton').addEventListener('click', function() {
+                window.location.href = '/';
+            });
+        });
+    </script>
+</body>
+</html>

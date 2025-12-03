@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zip Settings Editor</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <button class="home-button" id="homeButton">Home</button>
+    
+    <div class="container">
+        <h1>Zip Settings Editor</h1>
+        
+        <div id="loading">
+            <p>Loading available zip files...</p>
+        </div>
+        
+        <div id="error" class="hidden">
+            <p class="error-message"></p>
+        </div>
+        
+        <div id="zipSelection" class="hidden">
+            <h2>Select a Zip File</h2>
+            <div class="zip-files-container">
+                <ul id="zipFilesList" class="zip-files-list">
+                    <!-- Zip files will be dynamically generated here -->
+                </ul>
+            </div>
+
+            <div class="input-container">
+                 <label for="buildNumInput">Download Build</label>
+                <input type="text" id="buildNumInput" placeholder="example:5.1.20">
+                <button id="searchBuildButton">Search</button>
+            </div>  
+         
+        </div>
+
+
+
+        <div id="content" class="hidden">
+            <h2>Edit Settings</h2>
+            <p>Zip File: <span id="zipFileName"></span></p>
+            
+       
+            <form id="settingsForm">
+                <div id="settingsFields">
+                    <!-- Settings fields will be dynamically generated here -->
+                </div>
+                
+                <div class="form-group checkbox">
+                    <input type="checkbox" id="upgradeFirmware" name="upgradeFirmware">
+                    <label for="upgradeFirmware">Update Firmware</label>
+                </div>
+                
+                <div class="button-group">
+                    <button type="submit" id="saveButton">Save Changes</button>
+                </div>
+            </form>
+        </div>
+        
+        <div id="success" class="hidden">
+            <p>Settings saved successfully!</p>
+            <button id="downloadButton">Download Modified Zip</button>
+        </div>
+    </div>
+    
+    <script src="js/main.js"></script>
+</body>
+</html>
+
