@@ -22,7 +22,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let jsZipInstance = null;
     
     // Editable parameters - these are the ones that will be displayed in the UI
-    const editableParams = ['NetworkName', 'UseSSL', 'RVServer'];
+    const editableParams = ['NetworkName', 'UseSSL', 'RVServer', 'RebootOnError', 'WiFiSSID', 'WiFiPass', 'WiFiIPConfig',
+        'Rotation', 'VideoRotation', 'AdServer', 'ScreenshotInterval', 'ProfileInterval', 'ChannelInterval', 'DiagnosticMode', 'DiagnosticPwd',
+        'PersistentRemoteConsole','AppVideoDecoder','ScreenLayout','ScreenBezelPixels'
+    ];
     
     // RVServer credentials - in a real app, these would be securely stored
     const RVServerPassword = "[RVENC]CAB90B8B794D92C9201660E9821ABF7B06B45D14D3649BBFC4589AF4E6E672F1";
@@ -48,83 +51,268 @@ document.addEventListener('DOMContentLoaded', () => {
     }
      
     // Function to create form fields 
-    function createSettingsFields() {
+    function createSettingsFields(originalSettings) {
         settingsFieldsElement.innerHTML = '';
         
-        // Only display the editable parameters in the UI form
-        for (const key of editableParams) {
-            const value = "";
-            const fieldDiv = document.createElement('div');
-            fieldDiv.className = 'form-group parameter-field';
+        // Define sections and their fields
+        const sections = {
+            'Server Configuration': ['RVServer', 'UseSSL'],
+            'Playback': ['Rotation','VideoRotation','ScreenLayout','ScreenBezelPixels','AppVideoDecoder'],
+            'Communication': ['AdServer','ScreenshotInterval', 'ProfileInterval', 'ChannelInterval'],
+            'Networking': ['NetworkName', 'WiFiSSID', 'WiFiPass', 'WiFiIPConfig'],
+            'System': ['RebootOnError', 'DiagnosticMode', 'DiagnosticPwd', 'PersistentRemoteConsole'],
+        };
+        
+
+        // Create grid container
+        const gridContainer = document.createElement('div');
+        gridContainer.style.display = 'grid';
+        gridContainer.style.gridTemplateColumns = '1fr 1fr';
+        gridContainer.style.gridTemplateRows = 'auto auto auto';
+        gridContainer.style.gap = '20px';
+        
+        // Create each section
+        for (const [sectionName, fields] of Object.entries(sections)) {
+            const sectionDiv = document.createElement('div');
+            sectionDiv.className = 'settings-section';
+            sectionDiv.style.backgroundColor = '#f5f5f5';
+            sectionDiv.style.padding = '15px';
+            sectionDiv.style.borderRadius = '8px';
+            sectionDiv.style.border = '1px solid #ddd';
             
-            const label = document.createElement('label');
-            label.setAttribute('for', key);
-            label.textContent = key;
+            const sectionTitle = document.createElement('h3');
+            sectionTitle.textContent = sectionName;
+            sectionDiv.appendChild(sectionTitle);
             
-            let input;
-            
-            // Special handling for UseSSL parameter
-            if (key === 'UseSSL') {
-                input = document.createElement('select');
+            // Add fields for this section
+            for (const key of fields) {
+                const value = "";
+                const fieldDiv = document.createElement('div');
+                fieldDiv.className = 'form-group parameter-field';
                 
-                const trueOption = document.createElement('option');
-                trueOption.value = 'true';
-                trueOption.textContent = 'true';
+                const label = document.createElement('label');
+                label.setAttribute('for', key);
+                label.textContent = key;
                 
-                const falseOption = document.createElement('option');
-                falseOption.value = 'false';
-                falseOption.textContent = 'false';
-                falseOption.selected = true;   //default to false option
+                let input;
                 
-                input.appendChild(trueOption);
-                input.appendChild(falseOption); 
-                
-            } else {
-                input = document.createElement('input');
-                input.type = 'text';
-                input.value = value;
-            }
-            
-            input.id = key;
-            input.name = key;
-            input.classList.add('editable-field');
-            
-            // Create warning element for RVServer field
-            let warningElement;
-            if (key === 'RVServer') {
-                warningElement = document.createElement('span');
-                warningElement.id = 'rvserver-warning';
-                warningElement.className = 'warning-text hidden';
-                warningElement.textContent = '';
-                
-                // Add event listener to RVServer input to validate the form
-                input.addEventListener('input', function(e) {
-                    validateForm();
-                    
-                    // Check if the user is typing "http" and show/hide warning
-                    const value = e.target.value.toLowerCase();
-                    if (value.includes('http')) {
-                        warningElement.textContent = 'Warning: do not use "http" in the rvserver field.';
-                    } else {
-                        warningElement.textContent = '';
+                // Special handling for UseSSL parameter
+                if (key === 'UseSSL' ) {
+                    input = document.createElement('input');
+                    input.type = 'checkbox';
+                    //input.defaultValue = false;
+
+                } else if (key === 'RebootOnError') {
+                    input = document.createElement('input');
+                    input.type = 'checkbox';
+                    //input.defaultValue = true;
+                    input.checked = true;
+                } else if (key === 'DiagnosticMode') {
+                    input = document.createElement('input');
+                    input.type = 'checkbox';
+
+                } else if (key === "ProfileInterval") {
+                    input = document.createElement('input');
+                    input.type = 'number';
+                    input.min = '60';
+                    input.max = '3600';
+                    input.defaultValue = '1800';
+                    input.placeholder = '1800';
+                    input.onmouseover = function() {
+                        this.title = 'Enter interval in seconds (60 to 3600)';
                     }
-                });
+                    input.value = value;
+                } else if (key === "ChannelInterval") {
+                    input = document.createElement('input');
+                    input.type = 'number';
+                    input.min = '10';
+                    input.max = '600';
+                    input.defaultValue = '60';
+                    input.placeholder = '60';
+                    input.onmouseover = function() {
+                        this.title = 'Enter interval in seconds (10 to 600)';
+                    }
+                    input.value = value;
+                } else if (key === "ScreenshotInterval") {
+                    input = document.createElement('input');
+                    input.type = 'number';
+                    input.min = '0';
+                    input.max = '60';
+                    input.defaultValue = '0';
+                    input.placeholder = '0';
+                    input.onmouseover = function() {
+                        this.title = 'Enter interval in minutes (0 to disable)';
+                    }
+                    input.value = value;
+                } else if (key === "Rotation") {
+                    input = document.createElement('input');
+                    input.type = 'number';
+                    input.min = '0';
+                    input.max = '270';
+                    input.step = '90';
+                    input.defaultValue = '0';
+                    input.placeholder = '0';
+                    input.onmouseover = function() {
+                        this.title = 'Enter rotation in degrees (0, 90, 180, or 270)';
+                    }
+                    input.value = value;
+                } else if (key === "VideoRotation") {
+                    input = document.createElement('input');
+                    input.type = 'number';
+                    input.min = '0';
+                    input.max = '270';
+                    input.defaultValue = '0';
+                    input.placeholder = '0';
+                    input.onmouseover = function() {
+                        this.title = 'Enter rotation in degrees (0, 90, 180, or 270)';
+                    }
+                    input.step = '90';
+                    input.value = value;
+                } else if (key === "WiFiIPConfig") {
+                    input = document.createElement('input');
+                    input.type = 'text';
+                    input.placeholder = 'dhcp';
+                    input.onmouseover = function() {
+                        this.title = 'Enter "dhcp" for automatic IP configuration or "ip|subnet|gateway|broadcast|dns1|dns2|dns3" for static IP configuration.';
+                    }
+                    input.value = value;
+                    input.defaultValue = 'dhcp';
+                } else if (key === 'PersistentRemoteConsole') {
+                    input = document.createElement('input');
+                    input.type = 'checkbox';
+
+                    if(!originalSettings || !originalSettings.includes(key)) {
+                        input.disabled = true;
+                        input.onmouseover = function() {
+                        this.title = 'This parameter is not supported in the current build.'; }
+                    }
+                } else if (key === 'AppVideoDecoder') {
+                    input = document.createElement('select');
+
+                    const brightSignOption = document.createElement('option');
+                    brightSignOption.value = 'brightsign';
+                    brightSignOption.textContent = 'brightsign';
+
+                    const browserOption = document.createElement('option');
+                    browserOption.value = 'browser';
+                    browserOption.textContent = 'browser';
+                    
+                    const autoOption = document.createElement('option');
+                    autoOption.value = 'auto';
+                    autoOption.textContent = 'auto';
+                    autoOption.selected = true;
+
+                    input.appendChild(brightSignOption);
+                    input.appendChild(browserOption);
+                    input.appendChild(autoOption);
+
+                    if(!originalSettings || !originalSettings.includes(key)) {
+                        input.disabled = true;
+                        input.onmouseover = function() {
+                        this.title = 'This parameter is not supported in the current build.'; }
+                    }
+
+                } else if (key === 'ScreenLayout') {
+                    input = document.createElement('select');
+                    
+                    const horizontalOption = document.createElement('option');
+                    horizontalOption.value = 'horizontal';
+                    horizontalOption.textContent = 'horizontal';
+
+                    const verticalOption = document.createElement('option');
+                    verticalOption.value = 'vertical';
+                    verticalOption.textContent = 'vertical';
+                    
+                    const gridOption = document.createElement('option');
+                    gridOption.value = 'grid';
+                    gridOption.textContent = 'grid';
+                    
+                    const disabledOption = document.createElement('option');
+                    disabledOption.value = 'disabled';
+                    disabledOption.textContent = 'disabled';
+                    disabledOption.selected = true;
+
+                    input.appendChild(horizontalOption);
+                    input.appendChild(verticalOption);
+                    input.appendChild(gridOption);
+                    input.appendChild(disabledOption);
+
+                    if(!originalSettings || !originalSettings.includes(key)) {
+                        input.disabled = true;
+                        input.onmouseover = function() {
+                        this.title = 'This parameter is not supported in the current build.'; }
+                    }
+
+                } else if (key === "ScreenBezelPixels") {
+                    input = document.createElement('input');
+                    input.type = 'number';
+                    input.min = '0';
+                    input.defaultValue = '0';
+                    input.placeholder = '0';
+                    
+                    input.value = value;
+                    if(!originalSettings || !originalSettings.includes(key)) {
+                        input.disabled = true;
+                        input.onmouseover = function() {
+                            this.title = 'This parameter is not supported in the current build.'; }
+                    } else {
+                        input.onmouseover = function() {
+                            this.title = 'Screen Bezel size in pixels';}
+                    }
+                } else {
+                    input = document.createElement('input');
+                    input.type = 'text';
+                    input.value = value;
+                }
+                
+                input.id = key;
+                input.name = key;
+                input.classList.add('editable-field');
+                
+                // Add red border for RVServer field
+                if (key === 'RVServer') {
+                    input.style.border = '2px solid red';
+                }
+                
+                // Create warning element for RVServer field
+                let warningElement;
+                if (key === 'RVServer') {
+                    warningElement = document.createElement('span');
+                    warningElement.id = 'rvserver-warning';
+                    warningElement.className = 'warning-text hidden';
+                    warningElement.textContent = '';
+                    
+                    input.addEventListener('input', function(e) {
+                        validateForm();
+                        
+                        const value = e.target.value.toLowerCase();
+                        if (value.includes('http')) {
+                            warningElement.textContent = 'Warning: do not use "http" in the rvserver field.';
+                        } else {
+                            warningElement.textContent = '';
+                        }
+                    });
+                }
+                
+                fieldDiv.appendChild(label);
+                if (key === 'RVServer') {
+                    const labelContainer = document.createElement('div');
+                    labelContainer.style.display = 'flex';
+                    labelContainer.style.alignItems = 'center';
+                    labelContainer.appendChild(label);
+                    labelContainer.appendChild(warningElement);
+                    fieldDiv.appendChild(labelContainer);
+                } else {
+                    fieldDiv.appendChild(label);
+                }
+                fieldDiv.appendChild(input);
+                sectionDiv.appendChild(fieldDiv);
             }
             
-            fieldDiv.appendChild(label);
-            if (key === 'RVServer') {
-                const labelContainer = document.createElement('div');
-                labelContainer.style.display = 'flex';
-                labelContainer.style.alignItems = 'center';
-                labelContainer.appendChild(label);
-                labelContainer.appendChild(warningElement);
-                fieldDiv.appendChild(labelContainer);
-            } else {
-                fieldDiv.appendChild(label);
-            }
-            fieldDiv.appendChild(input);
-            settingsFieldsElement.appendChild(fieldDiv);
+            gridContainer.appendChild(sectionDiv);
         }
+        
+        settingsFieldsElement.appendChild(gridContainer);
         
         // Initially disable the Save button until RVServer has a value
         saveButton.disabled = true;
@@ -173,7 +361,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Update the UI
             zipFileNameElement.textContent = currentZipFileName;
-            createSettingsFields();
+            createSettingsFields(originalSettings);
             
             // Show the content
             loadingElement.classList.add('hidden');
@@ -217,20 +405,31 @@ document.addEventListener('DOMContentLoaded', () => {
         event.preventDefault();
         
         try {
+			
             if (!jsZipInstance || !currentZipFile) {
                 throw new Error('No zip file loaded');
             }
+			
+			saveButton.disabled = true;
             
             // Collect the editable parameter values from the form
             let editableParamValues = {};
             for (const param of editableParams) {
                 const input = document.getElementById(param);
-                if (input) {
+                if (input && !input.disabled) {
                     let value = input.value;
                     
-                    // Convert values for select elements
-                    if (input.tagName === 'SELECT') {
-                        value = value === 'true';
+					if (input.name === 'ScreenshotInterval') {
+                        value = parseInt(input.value) * 60;
+                    }
+					
+					// Convert values for boolean elements
+                    if (input.type === 'checkbox') {
+                        value = input.checked;
+                    }
+					
+                    if (input.value === '') {
+                        value = input.defaultValue;
                     }
                     
                     editableParamValues[param] = value;
@@ -252,17 +451,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (key === 'NetworkName') {
                     networkNameFile = value;
                 }
-                
-                if (key === 'UseSSL') {
-                    newSettingsParams = newSettingsParams + `    "${key}": ${value},\n`;
+                //console.log('key:'+key+' value:'+value);
+                //if (key === 'UseSSL') {
+				if (key === 'NetworkName' && (value === "" || value === null || value === undefined))
+				{
+					newSettingsParams = newSettingsParams + "    \"" + [key] + "\": \"\",\n";
+				} else if (value === ""){
+					newSettingsParams = newSettingsParams + "    \"" + [key] + "\": null,\n";					
+				} else if (isFinite(value) && !(key === "WiFiPass" || key === "DiagnosticPwd"))
+				{	
+                    newSettingsParams = newSettingsParams + "    \"" + [key] + "\": " + [value] + ",\n";
                 } else {
-                    newSettingsParams = newSettingsParams + `    "${key}": "${value}",\n`;
+                    newSettingsParams = newSettingsParams + "    \"" + [key] + "\": \"" + [value] + "\",\n";
                 }
             }
             
             // Update RVServerUser and RVServerPassword
             newSettingsParams = newSettingsParams + `    "RVServerUser": "${RVServerUser}",\n`;
-            newSettingsParams = newSettingsParams + `    "RVServerPassword": "${RVServerPassword}",`;
+            newSettingsParams = newSettingsParams + `    "RVServerPassword": "${RVServerPassword}",\n`;
+			newSettingsParams = newSettingsParams + "    \"RVServerAuthMode\": \"" + "Basic" + "\",";
             
             // Add the new parameters to the settings content
             settingsContent = addStringToLine(settingsContent, newSettingsParams, 2);

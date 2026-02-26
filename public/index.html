@@ -63,6 +63,18 @@
             <p>Settings saved successfully!</p>
             <button id="downloadButton">Download Modified Zip</button>
         </div>
+        
+        <div id="archiveSelection" class="hidden">
+            <h2>Select Archives to Download</h2>
+            <form id="archiveForm">
+                <div id="archiveList">
+                    <!-- Archive checkboxes will be dynamically generated here -->
+                </div>
+                <div class="button-group">
+                    <button type="button" id="downloadArchivesButton" disabled>Download Selected</button>
+                </div>
+            </form>
+        </div>
     </div>
     
     <script src="js/main.js"></script>

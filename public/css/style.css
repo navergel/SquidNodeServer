@@ -29,7 +29,25 @@ h1, h2 {
 
 /* Form Styles */
 .form-group {
-    margin-bottom: 20px;
+    margin-bottom: 15px;
+}
+
+.parameter-field {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.parameter-field label {
+    min-width: 150px;
+    margin-bottom: 0;
+}
+
+.parameter-field input[type="text"],
+.parameter-field input[type="number"],
+.parameter-field select {
+    width: 200px;
+    flex-shrink: 0;
 }
 
 label {
@@ -38,12 +56,13 @@ label {
     font-weight: bold;
 }
 
-input[type="text"], select {
+input[type="text"], input[type="number"], select {
     width: 100%;
     padding: 10px;
     border: 1px solid #ddd;
     border-radius: 4px;
     font-size: 16px;
+    box-sizing: border-box;
 }
 
 select {
@@ -51,7 +70,7 @@ select {
     background-color: white;
 }
 
-.input-container {
+.inutp-container {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -91,6 +110,7 @@ select {
 .checkbox {
     display: flex;
     align-items: center;
+    margin-top: 30px;
 }
 
 .checkbox input {
@@ -173,8 +193,6 @@ button:hover {
 
 /* Zip Files List Styles */
 .zip-files-container {
-    max-height: 300px;
-    overflow-y: auto;
     border: 1px solid #ddd;
     border-radius: 4px;
     margin-bottom: 20px;

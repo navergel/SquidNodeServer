@@ -4,6 +4,16 @@ const os = require('os');
 const path = require('path');
 const AdmZip = require('adm-zip');
 const { spawn } = require('child_process');
+const ini = require('ini');
+
+// Helper function to find available Python command
+function findPythonCommand() {
+  return new Promise((resolve) => {
+    const test = spawn('python3', ['--version']);
+    test.on('error', () => resolve('python'));
+    test.on('close', (code) => resolve(code === 0 ? 'python3' : 'python'));
+  });
+}
 
 
 const app = express();
@@ -17,9 +27,13 @@ app.use(express.static('public'));
 // Define paths
 const ARCHIVES_DIR = path.join(__dirname, 'archives');
 const TEMP_DIR = path.join(__dirname, 'temp');
+const CONFIG_PATH = path.join(__dirname, 'config.ini');
 
-// Editable parameters - these are the ones that will be displayed in the UI
-const editableParams = ['NetworkName', 'UseSSL', 'RVServer'];
+// Read config file
+const config = ini.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
+const PYTHON_SCRIPT_PATH = config.paths.pythonScript;
+
+
 //todo: instead of storing password/user here, we could put in Environment variables and read from there
 const RVServerPassword = "[RVENC]CAB90B8B794D92C9201660E9821ABF7B06B45D14D3649BBFC4589AF4E6E672F1";
 const RVServerUser = "ReflectEdge";
@@ -136,8 +150,15 @@ app.post('/api/save', async (req, res) => {
     
     //nv test removing lines from settings files
     try { 
-        removeLinesWithText(tempSettingsPath, editableParams);
-        //console.log('Lines with'+editableParams+ ' removed successfully.');
+        const userParams = new Array();
+        //console.log('editableParams removed successfully: '+editableParams);
+        if (editableParamValues) {
+           for (const [key, value] of Object.entries(editableParamValues)) {
+              console.log('editableParamValues: key'+key);
+              userParams.push(key);
+           }
+        }
+        removeLinesWithText(tempSettingsPath, userParams);
     } catch (error) {
         console.error('Error removing lines:', error);
     }
@@ -152,13 +173,20 @@ app.post('/api/save', async (req, res) => {
     // Update the editable parameters with the values from the UI
     if (editableParamValues) {
       for (const [key, value] of Object.entries(editableParamValues)) {
+        console.log('nv server.js:api/save - processing key:'+key+' value:'+value);
         if (key !== 'upgradeFirmware') {
           if (key === 'NetworkName')
           {
             networkNameFile = value;
           }
 
-          if (key === 'UseSSL')
+          // Check empty values first
+          if (key === 'NetworkName' && (value === "" || value === null || value === undefined))
+          {
+            newSettingsParams = newSettingsParams + "    \"" + [key] + "\": \"\",\n";  
+          } else if (value === ""){
+            newSettingsParams = newSettingsParams + "    \"" + [key] + "\": null,\n";
+          } else if (Number.isFinite(value) && !(key === "WiFiPass" || key === "DiagnosticPwd"))
           {
             newSettingsParams = newSettingsParams + "    \"" + [key] + "\": " + value + ",\n";  
           } else {
@@ -171,7 +199,8 @@ app.post('/api/save', async (req, res) => {
     
     // Update RVServerUser and RVServerPassword
     newSettingsParams = newSettingsParams + "    \"RVServerUser\": \"" + RVServerUser + "\",\n";
-    newSettingsParams = newSettingsParams + "    \"RVServerPassword\": \"" + RVServerPassword + "\",";
+    newSettingsParams = newSettingsParams + "    \"RVServerPassword\": \"" + RVServerPassword + "\",\n";
+    newSettingsParams = newSettingsParams + "    \"RVServerAuthMode\": \"" + "Basic" + "\",\n";
     
     
     //console.log("nv server.js::/api/save: newSettingsParams:"+ newSettingsParams);
@@ -255,21 +284,29 @@ function insertTextAt(originalString, textToInsert, position) {
  */
 function removeLinesWithText(filePath, stringsToRemove) {
   try {
-    
-    
       const fileContent = fs.readFileSync(filePath, 'utf-8');
       const lines = fileContent.split('\n');
 
       const updatedLines = lines.filter(line => {
         return !stringsToRemove.some(str => line.includes(str));
       });
+      
+      // Remove trailing comma from last line before closing brace
+      for (let i = updatedLines.length - 1; i >= 0; i--) {
+        if (updatedLines[i].trim() === '}') {
+          // Found closing brace, check previous line
+          if (i > 0 && updatedLines[i-1].trim().endsWith(',')) {
+            updatedLines[i-1] = updatedLines[i-1].replace(/,\s*$/, '');
+          }
+          break;
+        }
+      }
+      
       fs.writeFileSync(filePath, updatedLines.join('\n'), 'utf-8');
-      //console.log('Lines removed successfully.');
+      
   } catch (error) {
         console.error('An error occurred:', error);
   }
-      
-
 }
 
 
@@ -292,6 +329,7 @@ function addStringToLine(filePath, stringToAdd, lineNumber) {
 
 
 // Route to handle search build (call Python script)
+// not currently used
 app.post('/api/search-build', async (req, res) => {
   try {
     const { searchTerm } = req.body;
@@ -301,7 +339,7 @@ app.post('/api/search-build', async (req, res) => {
     }
     
     // Path to your Python script
-    const pythonScriptPath = "C:\\Users\\nelson.vergel\\OneDrive - Creative Realities Inc\\Documents\\QADevelopment\\JIRA_BS_ArchiveDownloader\\jira_attachment_downloader.py";
+    const pythonScriptPath = PYTHON_SCRIPT_PATH;
     const scriptDir = path.dirname(pythonScriptPath);
     const scriptName = path.basename(pythonScriptPath);
     
@@ -314,8 +352,8 @@ app.post('/api/search-build', async (req, res) => {
     console.log("searchTerm:"+searchTerm);
     console.log("scriptDir:"+scriptDir);
     
-    // Execute Python script with the search term as argument, running from script directory
-    const pythonProcess = spawn('python', [scriptName, searchTerm], { cwd: scriptDir });
+    const pythonCmd = await findPythonCommand();
+    const pythonProcess = spawn(pythonCmd, [scriptName, searchTerm], { cwd: scriptDir });
     
     let stdout = '';
     let stderr = '';
@@ -346,6 +384,129 @@ app.post('/api/search-build', async (req, res) => {
     
   } catch (error) {
     console.error('Error in search build endpoint:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Route to handle search build (call Python script)
+app.post('/api/list-archives', async (req, res) => {
+  try {
+    const { searchTerm } = req.body;
+    
+    if (!searchTerm) {
+      return res.status(400).json({ error: 'Search term is required' });
+    }
+    
+    // Path to your Python script
+    const pythonScriptPath = PYTHON_SCRIPT_PATH;
+    const scriptDir = path.dirname(pythonScriptPath);
+    const scriptName = path.basename(pythonScriptPath);
+    
+    // Check if Python script exists
+    if (!fs.existsSync(pythonScriptPath)) {
+      return res.status(404).json({ error: 'Python script not found' });
+    }
+    
+    console.log("pythonScriptPath:"+pythonScriptPath);
+    console.log("listTerm:"+searchTerm);
+    console.log("scriptDir:"+scriptDir);
+    
+    const pythonCmd = await findPythonCommand();
+    const pythonProcess = spawn(pythonCmd, [scriptName, searchTerm], { cwd: scriptDir });
+    
+    let stdout = '';
+    let stderr = '';
+    
+    pythonProcess.stdout.on('data', (data) => {
+      //console.log("Python stdout data:"+data.toString());
+      stdout += data.toString();
+    });
+    
+    pythonProcess.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+    
+    pythonProcess.on('close', (code) => {
+      //console.log("Python process closed with code:"+code);
+      if (code === 0) {
+        // Success
+        res.json({ success: true, message: stdout.trim() });
+      } else {
+        // Error
+        //const errorMessage = stderr.trim() || stdout.trim() || `Python script exited with code ${code}`;
+        const errorMessage = stdout.trim() || `Python script exited with code ${code}`;
+        res.status(500).json({ error: errorMessage });
+        
+      }
+    });
+    
+    pythonProcess.on('error', (error) => {
+      console.error('Error executing Python script:', error);
+      res.status(500).json({ error: `Failed to execute Python script: ${error.message}` });
+    });
+    
+  } catch (error) {
+    console.error('Error in search build endpoint:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Route to handle download archive from JIRA (call Python script)
+app.post('/api/download-archive', async (req, res) => {
+  try {
+    const { issue, archive  } = req.body;
+    
+    if (!issue || !archive) {
+      return res.status(400).json({ error: 'issue and archive parameters are required' });
+    }
+    
+    console.log("issue:"+issue+" archive:"+archive+" calling script");
+
+    // Path to your Python script
+    const pythonScriptPath = PYTHON_SCRIPT_PATH;
+    const scriptDir = path.dirname(pythonScriptPath);
+    const scriptName = path.basename(pythonScriptPath);
+    
+    // Check if Python script exists
+    if (!fs.existsSync(pythonScriptPath)) {
+      return res.status(404).json({ error: 'Python script not found' });
+    }
+    
+    console.log("pythonScriptPath:"+pythonScriptPath);
+    console.log("scriptDir:"+scriptDir);
+    
+    const pythonCmd = await findPythonCommand();
+    const pythonProcess = spawn(pythonCmd, [scriptName, issue, archive], { cwd: scriptDir });
+    
+    let stdout = '';
+    let stderr = '';
+    
+    pythonProcess.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+    
+    pythonProcess.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+    
+    pythonProcess.on('close', (code) => {
+      if (code === 0) {
+        // Success
+        res.json({ success: true, message: stdout.trim() });
+      } else {
+        // Error
+        const errorMessage = stderr.trim() || stdout.trim() || `Python script exited with code ${code}`;
+        res.status(500).json({ error: errorMessage });
+      }
+    });
+    
+    pythonProcess.on('error', (error) => {
+      console.error('Error executing Python script:', error);
+      res.status(500).json({ error: `Failed to execute Python script: ${error.message}` });
+    });
+    
+  } catch (error) {
+    console.error('Error in downloadArchive:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
