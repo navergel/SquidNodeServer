@@ -381,9 +381,8 @@ app.post('/api/list-archives', async (req, res) => {
     console.log("listTerm:" + searchTerm);
     
     const archives = await jiraDownloader.listIssueArchives(searchTerm);
-    // Return in same format as the Python script: "KEY:filename\n" per line
-    const message = archives.join('\n');
-    res.json({ success: true, message });
+    // Return structured array with key, filename, and status
+    res.json({ success: true, archives });
     
   } catch (error) {
     console.error('Error in list archives endpoint:', error);

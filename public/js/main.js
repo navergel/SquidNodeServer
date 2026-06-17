@@ -583,8 +583,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             
             if (response.ok && data.success) {
-                console.log("script response:"+data.message);
-                displayArchiveSelection(data.message);
+                console.log("script response:", data.archives);
+                displayArchiveSelection(data.archives);
             } else {
                 // Error - show the error message
                 const errorMessage = data.error || 'Unknown error occurred';
@@ -602,28 +602,40 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Display archive selection form
-    function displayArchiveSelection(archivesText) {
-        const cleanText = archivesText.replace(/\\n/g, '\n').replace(/\r/g, '');
-        const archives = cleanText.split('\n').filter(line => line.trim() !== '');
-        
+    function displayArchiveSelection(archives) {
         archiveListElement.innerHTML = '';
         
         archives.forEach((archive, index) => {
             const checkboxDiv = document.createElement('div');
-            checkboxDiv.className = 'form-group checkbox';
+            checkboxDiv.className = 'form-group checkbox archive-item';
             
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
             checkbox.id = `archive-${index}`;
-            checkbox.value = archive;
+            checkbox.value = `${archive.key}:${archive.filename}`;
             checkbox.addEventListener('change', updateDownloadButton);
             
             const label = document.createElement('label');
             label.setAttribute('for', `archive-${index}`);
-            label.textContent = archive;
+            label.textContent = archive.filename;
+            
+            // Create status badge
+            const statusBadge = document.createElement('span');
+            const statusLower = archive.status.toLowerCase();
+            if (statusLower === 'beta') {
+                statusBadge.className = 'status-badge status-beta';
+                statusBadge.textContent = 'Beta';
+            } else if (statusLower === 'approved for use') {
+                statusBadge.className = 'status-badge status-approved';
+                statusBadge.textContent = 'Approved For Use';
+            } else {
+                statusBadge.className = 'status-badge';
+                statusBadge.textContent = archive.status;
+            }
             
             checkboxDiv.appendChild(checkbox);
             checkboxDiv.appendChild(label);
+            checkboxDiv.appendChild(statusBadge);
             archiveListElement.appendChild(checkboxDiv);
         });
         
@@ -642,6 +654,11 @@ document.addEventListener('DOMContentLoaded', () => {
     async function downloadSelectedArchives() {
         const checkboxes = document.querySelectorAll('#archiveList input[type="checkbox"]:checked');
         const selectedArchives = Array.from(checkboxes).map(cb => cb.value);
+        
+        // Guard: do nothing if no archives selected
+        if (selectedArchives.length === 0) {
+            return;
+        }
         
         // Disable all buttons and show notification
         const allButtons = document.querySelectorAll('button');

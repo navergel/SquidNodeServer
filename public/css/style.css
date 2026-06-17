@@ -285,3 +285,33 @@ button:disabled:hover {
     background-color: #14772d;
 }
 
+
+/* Archive Status Badges */
+.archive-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 12px;
+    font-weight: bold;
+    text-transform: uppercase;
+    margin-left: 8px;
+    white-space: nowrap;
+}
+
+.status-beta {
+    background-color: #ffebee;
+    color: #d32f2f;
+    border: 1px solid #d32f2f;
+}
+
+.status-approved {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+    border: 1px solid #2e7d32;
+}

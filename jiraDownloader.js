@@ -70,7 +70,7 @@ class JiraAttachmentDownloader {
     const response = await this.axiosInstance.post('/rest/api/3/search/jql', {
       jql,
       maxResults,
-      fields: ['summary', 'attachment'],
+      fields: ['summary', 'attachment', 'status'],
     });
     return response.data.issues || [];
   }
@@ -104,7 +104,7 @@ class JiraAttachmentDownloader {
    * List zip archive attachments for matching tickets.
    * Equivalent to Python's list_issue_archives(argument).
    * @param {string} argument - Search term
-   * @returns {Promise<string[]>} Array of "ISSUE_KEY:filename" strings
+   * @returns {Promise<Array<{key: string, filename: string, status: string}>>} Array of archive objects with issue key, filename, and status
    */
   async listIssueArchives(argument) {
     const jql = `project = "RV8" AND type = Build AND status IN ("Approved for Use", Beta) AND component = "BrightSign Player" AND textfields ~ "${argument}" ORDER BY created DESC`;
@@ -121,10 +121,11 @@ class JiraAttachmentDownloader {
 
     for (const issue of issues) {
       if (summaryPattern.test(issue.fields.summary)) {
+        const status = issue.fields.status ? issue.fields.status.name : 'Unknown';
         const attachments = issue.fields.attachment || [];
         for (const attachment of attachments) {
           if (zipPattern.test(attachment.filename)) {
-            results.push(`${issue.key}:${attachment.filename}`);
+            results.push({ key: issue.key, filename: attachment.filename, status });
           }
         }
         // Return after first matching issue (matches Python behavior)
