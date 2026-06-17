@@ -1,6 +1,6 @@
 {
   "name": "zip-editor-app",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Application to edit settings in zip archives",
   "main": "server.js",
   "scripts": {
