@@ -396,7 +396,7 @@ document.addEventListener('DOMContentLoaded', () => {
             loadingElement.classList.remove('hidden');
             loadingElement.querySelector('p').textContent = 'Loading settings from selected zip file...';
             
-            const response = await fetch(`/api/settings/${selectedZipFile}`);
+            const response = await fetch(`/api/settings/${encodeURIComponent(selectedZipFile)}`);
             
             if (!response.ok) {
                 const errorData = await response.json();
@@ -655,6 +655,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         console.log('Selected archives:', selectedArchives);
         
+        const errors = [];
+        
         for (const issueArchive of selectedArchives) {
             const [issue, archive] = issueArchive.split(':');
 
@@ -663,29 +665,37 @@ document.addEventListener('DOMContentLoaded', () => {
                 archive: archive
             };
 
-            const response = await fetch('/api/download-archive', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(requestData)
-            });
-            
-            const data = await response.json();
-            
-            if (response.ok && data.success) {
-                console.log("download-archive script response:"+data.message);
-                window.location.href = '/';  //reload home page
-            } else {
-                const errorMessage = data.error || 'Unknown error occurred';
-                showError(errorMessage);
+            try {
+                const response = await fetch('/api/download-archive', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestData)
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    console.log("download-archive script response:" + data.message);
+                } else {
+                    errors.push(data.error || `Failed to download ${archive}`);
+                }
+            } catch (err) {
+                errors.push(`Network error downloading ${archive}: ${err.message}`);
             }
+        }
+        
+        if (errors.length > 0) {
+            showError(errors.join('\n'));
+        } else {
+            window.location.href = '/';
         }
     }
 
     // Download the modified zip
     function downloadModifiedZip() {
-        window.location.href = `/api/download/${currentZipFileName}`;
+        window.location.href = `/api/download/${encodeURIComponent(currentZipFileName)}`;
     }
     
     // Function to reload to main page
@@ -701,6 +711,15 @@ document.addEventListener('DOMContentLoaded', () => {
     downloadArchivesButton.addEventListener('click', downloadSelectedArchives);
     homeButton.addEventListener('click', goToHomePage);
     
+    // Load app version
+    fetch('/api/version')
+      .then(res => res.json())
+      .then(data => {
+        const el = document.getElementById('appVersion');
+        if (el) el.textContent = 'v' + data.version;
+      })
+      .catch(() => {});
+
     // Initialize the application
     loadZipFiles();
 });

@@ -1,0 +1,148 @@
+
+
+Here's what you need to do:
+
+## 1. Install Node.js
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
+```
+
+Verify with `node -v` and `npm -v`.
+
+## 2. Clone/copy the project
+
+```bash
+git clone <your-repo-url> /opt/bs-archive-tool
+cd /opt/bs-archive-tool
+```
+
+Or just `scp`/rsync the project folder over.
+
+## 3. Install dependencies
+
+```bash
+npm install
+```
+
+## 4. Configure JIRA credentials
+
+Edit `jira_config.ini` with your real values:
+
+```ini
+[JIRA]
+url = https://cri.atlassian.net
+username = your_email@cri.com
+api_token = your_actual_api_token
+
+[Settings]
+download_directory = ./downloads
+```
+
+Make sure `config.ini` points to it (it already does by default):
+
+```ini
+[paths]
+jiraConfig=jira_config.ini
+```
+
+You can remove the `pythonScript` line from `config.ini` since it's no longer used.
+
+## 5. Create required directories
+
+```bash
+mkdir -p archives temp downloads
+```
+
+## 6. Test it
+
+```bash
+node server.js
+```
+
+You should see the server start on port 3000. Hit `http://<server-ip>:3000` in a browser to verify.
+
+## 7. Run as a service (so it survives reboots/disconnects)
+
+Create a systemd service file:
+
+```bash
+sudo nano /etc/systemd/system/bs-archive-tool.service
+```
+
+```ini
+[Unit]
+Description=BrightSign Archive Tool
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/bs-archive-tool
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=5
+Environment=PORT=3000
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Then enable and start it:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable bs-archive-tool
+sudo systemctl start bs-archive-tool
+sudo systemctl status bs-archive-tool
+```
+
+## 8. Open the firewall (if applicable)
+
+```bash
+sudo ufw allow 3000/tcp
+```
+
+Or if you want to put it behind nginx on port 80/443, set up a reverse proxy instead.
+
+## Optional: nginx reverse proxy
+
+If you want to access it on port 80:
+
+```bash
+sudo apt install nginx
+```
+
+Add to `/etc/nginx/sites-available/bs-archive-tool`:
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain-or-ip;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_read_timeout 300s;
+    }
+}
+```
+
+```bash
+sudo ln -s /etc/nginx/sites-available/bs-archive-tool /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl restart nginx
+```
+
+--- to check for errors starting service
+# Check the service logs
+sudo journalctl -u bs-archive-tool -n 50 --no-pager
+
+
+The `proxy_read_timeout 300s` is worth noting — JIRA downloads can be slow for large archives, and the default 60s timeout would cut them off.
+
+That's it. No Python needed anymore since we ported everything to Node.js.

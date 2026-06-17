@@ -3,18 +3,8 @@ const fs = require('fs-extra');
 const os = require('os');
 const path = require('path');
 const AdmZip = require('adm-zip');
-const { spawn } = require('child_process');
 const ini = require('ini');
-
-// Helper function to find available Python command
-function findPythonCommand() {
-  return new Promise((resolve) => {
-    const test = spawn('python3', ['--version']);
-    test.on('error', () => resolve('python'));
-    test.on('close', (code) => resolve(code === 0 ? 'python3' : 'python'));
-  });
-}
-
+const JiraAttachmentDownloader = require('./jiraDownloader');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -31,7 +21,17 @@ const CONFIG_PATH = path.join(__dirname, 'config.ini');
 
 // Read config file
 const config = ini.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
-const PYTHON_SCRIPT_PATH = config.paths.pythonScript;
+const JIRA_CONFIG_PATH = path.join(__dirname, config.paths.jiraConfig || 'jira_config.ini');
+
+// Initialize JIRA downloader (downloads go to the archives directory)
+let jiraDownloader;
+try {
+  jiraDownloader = new JiraAttachmentDownloader(JIRA_CONFIG_PATH, ARCHIVES_DIR);
+  console.log('JIRA downloader initialized successfully');
+} catch (err) {
+  console.error('Failed to initialize JIRA downloader:', err.message);
+  console.error('JIRA-related endpoints will not work until config is fixed.');
+}
 
 
 //todo: instead of storing password/user here, we could put in Environment variables and read from there
@@ -101,7 +101,7 @@ app.get('/api/settings/:zipFileName', async (req, res) => {
     });
   } catch (error) {
     console.error('Error processing zip file:', error);
-    res.status(500).json({ error: 'Failed to process zip file' });
+    res.status(500).json({ error: `Failed to process zip file: ${error.message}` });
   }
 });
 
@@ -154,7 +154,7 @@ app.post('/api/save', async (req, res) => {
         //console.log('editableParams removed successfully: '+editableParams);
         if (editableParamValues) {
            for (const [key, value] of Object.entries(editableParamValues)) {
-              console.log('editableParamValues: key'+key);
+              console.log('editableParamValues: key:'+key);
               userParams.push(key);
            }
         }
@@ -183,24 +183,31 @@ app.post('/api/save', async (req, res) => {
           // Check empty values first
           if (key === 'NetworkName' && (value === "" || value === null || value === undefined))
           {
-            newSettingsParams = newSettingsParams + "    \"" + [key] + "\": \"\",\n";  
+            //if networkname is empty, set value to ""
+            newSettingsParams += "    \"" + key + "\": \"\",\n";  
           } else if (value === ""){
-            newSettingsParams = newSettingsParams + "    \"" + [key] + "\": null,\n";
-          } else if (Number.isFinite(value) && !(key === "WiFiPass" || key === "DiagnosticPwd"))
-          {
-            newSettingsParams = newSettingsParams + "    \"" + [key] + "\": " + value + ",\n";  
+            newSettingsParams += "    \"" + key + "\": null,\n";
+          } else if (value === true || value === false || value === "true" || value === "false") {
+            // Boolean values: no quotes
+            const boolVal = (value === true || value === "true");
+            newSettingsParams += "    \"" + key + "\": " + boolVal + ",\n";
+          } else if (!(key === "WiFiPass" || key === "DiagnosticPwd") && String(value).trim() !== "" && !isNaN(Number(value))) {
+            // Numeric values: no quotes (but never treat passwords as numbers)
+            newSettingsParams += "    \"" + key + "\": " + Number(value) + ",\n";
           } else {
-            newSettingsParams = newSettingsParams + "    \"" + [key] + "\": \"" + value + "\",\n";
-            
+            newSettingsParams += "    \"" + key + "\": \"" + value + "\",\n";
           }
         }
       }
     }
     
     // Update RVServerUser and RVServerPassword
-    newSettingsParams = newSettingsParams + "    \"RVServerUser\": \"" + RVServerUser + "\",\n";
-    newSettingsParams = newSettingsParams + "    \"RVServerPassword\": \"" + RVServerPassword + "\",\n";
-    newSettingsParams = newSettingsParams + "    \"RVServerAuthMode\": \"" + "Basic" + "\",\n";
+    newSettingsParams += "    \"RVServerUser\": \"" + RVServerUser + "\",\n";
+    newSettingsParams += "    \"RVServerPassword\": \"" + RVServerPassword + "\",\n";
+    newSettingsParams += "    \"RVServerAuthMode\": \"Basic\",";
+    
+    // Remove trailing newline if present
+    newSettingsParams = newSettingsParams.replace(/\n$/, '');
     
     
     //console.log("nv server.js::/api/save: newSettingsParams:"+ newSettingsParams);
@@ -328,7 +335,7 @@ function addStringToLine(filePath, stringToAdd, lineNumber) {
 }
 
 
-// Route to handle search build (call Python script)
+// Route to handle search build (call JIRA downloader directly)
 // not currently used
 app.post('/api/search-build', async (req, res) => {
   try {
@@ -338,57 +345,27 @@ app.post('/api/search-build', async (req, res) => {
       return res.status(400).json({ error: 'Search term is required' });
     }
     
-    // Path to your Python script
-    const pythonScriptPath = PYTHON_SCRIPT_PATH;
-    const scriptDir = path.dirname(pythonScriptPath);
-    const scriptName = path.basename(pythonScriptPath);
-    
-    // Check if Python script exists
-    if (!fs.existsSync(pythonScriptPath)) {
-      return res.status(404).json({ error: 'Python script not found' });
+    if (!jiraDownloader) {
+      return res.status(500).json({ error: 'JIRA downloader not initialized. Check jira_config.ini.' });
     }
     
-    console.log("pythonScriptPath:"+pythonScriptPath);
-    console.log("searchTerm:"+searchTerm);
-    console.log("scriptDir:"+scriptDir);
+    console.log("searchTerm:" + searchTerm);
     
-    const pythonCmd = await findPythonCommand();
-    const pythonProcess = spawn(pythonCmd, [scriptName, searchTerm], { cwd: scriptDir });
+    const issue = await jiraDownloader.searchSpecificTickets(searchTerm);
+    if (!issue) {
+      return res.status(404).json({ error: 'No matching BrightSign Player ticket found' });
+    }
     
-    let stdout = '';
-    let stderr = '';
-    
-    pythonProcess.stdout.on('data', (data) => {
-      stdout += data.toString();
-    });
-    
-    pythonProcess.stderr.on('data', (data) => {
-      stderr += data.toString();
-    });
-    
-    pythonProcess.on('close', (code) => {
-      if (code === 0) {
-        // Success
-        res.json({ success: true, message: stdout.trim() });
-      } else {
-        // Error
-        const errorMessage = stderr.trim() || stdout.trim() || `Python script exited with code ${code}`;
-        res.status(500).json({ error: errorMessage });
-      }
-    });
-    
-    pythonProcess.on('error', (error) => {
-      console.error('Error executing Python script:', error);
-      res.status(500).json({ error: `Failed to execute Python script: ${error.message}` });
-    });
+    const result = await jiraDownloader.downloadAttachments(issue);
+    res.json({ success: true, message: `Downloaded ${result.downloaded} file(s), skipped ${result.skipped}` });
     
   } catch (error) {
     console.error('Error in search build endpoint:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: error.message || 'Internal server error' });
   }
 });
 
-// Route to handle search build (call Python script)
+// Route to list archives from JIRA
 app.post('/api/list-archives', async (req, res) => {
   try {
     const { searchTerm } = req.body;
@@ -397,117 +374,44 @@ app.post('/api/list-archives', async (req, res) => {
       return res.status(400).json({ error: 'Search term is required' });
     }
     
-    // Path to your Python script
-    const pythonScriptPath = PYTHON_SCRIPT_PATH;
-    const scriptDir = path.dirname(pythonScriptPath);
-    const scriptName = path.basename(pythonScriptPath);
-    
-    // Check if Python script exists
-    if (!fs.existsSync(pythonScriptPath)) {
-      return res.status(404).json({ error: 'Python script not found' });
+    if (!jiraDownloader) {
+      return res.status(500).json({ error: 'JIRA downloader not initialized. Check jira_config.ini.' });
     }
     
-    console.log("pythonScriptPath:"+pythonScriptPath);
-    console.log("listTerm:"+searchTerm);
-    console.log("scriptDir:"+scriptDir);
+    console.log("listTerm:" + searchTerm);
     
-    const pythonCmd = await findPythonCommand();
-    const pythonProcess = spawn(pythonCmd, [scriptName, searchTerm], { cwd: scriptDir });
-    
-    let stdout = '';
-    let stderr = '';
-    
-    pythonProcess.stdout.on('data', (data) => {
-      //console.log("Python stdout data:"+data.toString());
-      stdout += data.toString();
-    });
-    
-    pythonProcess.stderr.on('data', (data) => {
-      stderr += data.toString();
-    });
-    
-    pythonProcess.on('close', (code) => {
-      //console.log("Python process closed with code:"+code);
-      if (code === 0) {
-        // Success
-        res.json({ success: true, message: stdout.trim() });
-      } else {
-        // Error
-        //const errorMessage = stderr.trim() || stdout.trim() || `Python script exited with code ${code}`;
-        const errorMessage = stdout.trim() || `Python script exited with code ${code}`;
-        res.status(500).json({ error: errorMessage });
-        
-      }
-    });
-    
-    pythonProcess.on('error', (error) => {
-      console.error('Error executing Python script:', error);
-      res.status(500).json({ error: `Failed to execute Python script: ${error.message}` });
-    });
+    const archives = await jiraDownloader.listIssueArchives(searchTerm);
+    // Return in same format as the Python script: "KEY:filename\n" per line
+    const message = archives.join('\n');
+    res.json({ success: true, message });
     
   } catch (error) {
-    console.error('Error in search build endpoint:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Error in list archives endpoint:', error);
+    res.status(500).json({ error: error.message || 'Internal server error' });
   }
 });
 
-// Route to handle download archive from JIRA (call Python script)
+// Route to download archive from JIRA
 app.post('/api/download-archive', async (req, res) => {
   try {
-    const { issue, archive  } = req.body;
+    const { issue, archive } = req.body;
     
     if (!issue || !archive) {
       return res.status(400).json({ error: 'issue and archive parameters are required' });
     }
     
-    console.log("issue:"+issue+" archive:"+archive+" calling script");
-
-    // Path to your Python script
-    const pythonScriptPath = PYTHON_SCRIPT_PATH;
-    const scriptDir = path.dirname(pythonScriptPath);
-    const scriptName = path.basename(pythonScriptPath);
-    
-    // Check if Python script exists
-    if (!fs.existsSync(pythonScriptPath)) {
-      return res.status(404).json({ error: 'Python script not found' });
+    if (!jiraDownloader) {
+      return res.status(500).json({ error: 'JIRA downloader not initialized. Check jira_config.ini.' });
     }
     
-    console.log("pythonScriptPath:"+pythonScriptPath);
-    console.log("scriptDir:"+scriptDir);
+    console.log("issue:" + issue + " archive:" + archive + " downloading...");
     
-    const pythonCmd = await findPythonCommand();
-    const pythonProcess = spawn(pythonCmd, [scriptName, issue, archive], { cwd: scriptDir });
-    
-    let stdout = '';
-    let stderr = '';
-    
-    pythonProcess.stdout.on('data', (data) => {
-      stdout += data.toString();
-    });
-    
-    pythonProcess.stderr.on('data', (data) => {
-      stderr += data.toString();
-    });
-    
-    pythonProcess.on('close', (code) => {
-      if (code === 0) {
-        // Success
-        res.json({ success: true, message: stdout.trim() });
-      } else {
-        // Error
-        const errorMessage = stderr.trim() || stdout.trim() || `Python script exited with code ${code}`;
-        res.status(500).json({ error: errorMessage });
-      }
-    });
-    
-    pythonProcess.on('error', (error) => {
-      console.error('Error executing Python script:', error);
-      res.status(500).json({ error: `Failed to execute Python script: ${error.message}` });
-    });
+    const message = await jiraDownloader.downloadSpecificAttachment(issue, archive);
+    res.json({ success: true, message });
     
   } catch (error) {
     console.error('Error in downloadArchive:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: error.message || 'Internal server error' });
   }
 });
 
@@ -541,6 +445,12 @@ app.get('/api/download/:zipFileName', (req, res) => {
       console.error('Error cleaning up temp directory:', error);
     }
   });
+});
+
+// Route to get app version
+app.get('/api/version', (req, res) => {
+  const pkg = require('./package.json');
+  res.json({ version: pkg.version });
 });
 
 // Start the server
