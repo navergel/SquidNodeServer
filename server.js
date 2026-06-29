@@ -4,6 +4,7 @@ const os = require('os');
 const path = require('path');
 const AdmZip = require('adm-zip');
 const ini = require('ini');
+const { exec } = require('child_process');
 const JiraAttachmentDownloader = require('./jiraDownloader');
 
 const app = express();
@@ -450,6 +451,45 @@ app.get('/api/download/:zipFileName', (req, res) => {
 app.get('/api/version', (req, res) => {
   const pkg = require('./package.json');
   res.json({ version: pkg.version });
+});
+
+// Route to download squidCerts.zip
+app.get('/api/freeradius/download', (req, res) => {
+  const filePath = '/opt/squidCerts.zip';
+
+  try {
+    fs.accessSync(filePath, fs.constants.R_OK);
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      return res.status(404).json({ error: 'squidCerts.zip not found on server' });
+    }
+    console.error('Cannot access squidCerts.zip:', err.message);
+    return res.status(403).json({ error: 'Permission denied accessing squidCerts.zip' });
+  }
+
+  res.setHeader('Content-Disposition', 'attachment; filename=squidCerts.zip');
+  res.setHeader('Content-Type', 'application/zip');
+
+  const fileStream = fs.createReadStream(filePath);
+  fileStream.pipe(res);
+});
+
+// Route to generate new FreeRADIUS certs and restart the service
+// Requires sudoers entry: ubuntu ALL=(root) NOPASSWD: /usr/bin/make -C /etc/freeradius/3.0/certs all
+//                         ubuntu ALL=(root) NOPASSWD: /usr/sbin/service freeradius restart
+app.post('/api/freeradius/generate', (req, res) => {
+  const command = 'sudo make -C /etc/freeradius/3.0/certs all && sudo service freeradius restart';
+
+  exec(command, { timeout: 60000 }, (error, stdout, stderr) => {
+    if (error) {
+      console.error('Error generating certs:', error.message);
+      console.error('stderr:', stderr);
+      return res.status(500).json({ error: `Certificate generation failed: ${stderr || error.message}` });
+    }
+
+    console.log('Cert generation stdout:', stdout);
+    res.json({ success: true, message: 'Certificates generated and FreeRADIUS restarted successfully.' });
+  });
 });
 
 // Start the server

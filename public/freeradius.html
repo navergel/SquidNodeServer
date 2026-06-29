@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QA FreeRadius Page</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <button class="home-button" id="homeButton">Home</button>
+
+    <div class="container">
+        <h1>QA FreeRadius Page</h1>
+
+        <div class="freeradius-section">
+            <h2>Download Squid Certs Archive</h2>
+            <p>Download the current squidCerts.zip archive from the server.</p>
+            <div class="button-group">
+                <button id="downloadCertsButton" class="freeradius-btn">Download squidCerts.zip</button>
+            </div>
+        </div>
+
+        <hr style="margin: 30px 0;">
+
+        <div class="freeradius-section">
+            <h2>Download New Squid Certs Archive</h2>
+            <p>Regenerate and download new certificates. This will run <code>make all</code> in the certs directory and restart freeradius.</p>
+            <div class="button-group">
+                <button id="generateCertsButton" class="freeradius-btn">Generate New Certs</button>
+            </div>
+            <div id="generateResult" class="hidden" style="margin-top: 15px;"></div>
+        </div>
+    </div>
+
+    <!-- Processing Overlay -->
+    <div class="processing-overlay" id="processingOverlay">
+        <div class="processing-content">
+            <div class="spinner"></div>
+            <p id="processingMessage">Processing... Please wait.</p>
+        </div>
+    </div>
+
+    <script src="js/freeradius.js"></script>
+</body>
+</html>
