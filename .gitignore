@@ -7,6 +7,10 @@ yarn.lock
 temp/
 archives/*.zip
 
+# Backup / config archives (contain secrets, too large for GitHub)
+jira_config.zip
+jira_config.ini
+
 # Logs
 logs
 *.log
